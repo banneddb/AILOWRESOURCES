@@ -1,0 +1,1 @@
+The purpose of this repository is to grasp an understanding of how Large Language Models might utilize techniques like Retrieval Augmented Generation (RAG) in order to reduce hallucinations and improve accuracy.
