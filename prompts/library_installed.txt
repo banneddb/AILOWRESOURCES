@@ -1,0 +1,3 @@
+How the tests run: in Python {python_version}, where the {corpus} library is installed and can be imported.
+- Write the solution the way a student would in {corpus}, calling the library exactly as its documentation shows.
+- The tests may use the real library. Nothing may need a screen, sound card, network, or keyboard input; if a library call would, replace just that call with a small fake.

@@ -1,0 +1,5 @@
+How the tests run: in plain Python {python_version}, where the {corpus} library is NOT installed.
+- Write the solution the way a student would in {corpus}, calling the library exactly as its documentation shows (including any import a student would write, or none if the library's functions are available without one).
+- The tests must replace every library function and class the solution uses with a small fake before calling it. If the solution imports a library module, put a fake module into sys.modules before importing {solution_file}. If it uses library functions without an import, set the fakes as attributes of the imported solution module (e.g. solution.makeSound = fake_make_sound).
+- Make each fake behave the way the documentation describes, keep it as simple as possible, and don't fake anything the solution doesn't use.
+- Nothing may need a screen, sound card, network, files on disk, or keyboard input.

@@ -1,0 +1,72 @@
+# All tunable settings for the pipeline. Code reads these; nothing else is hardcoded.
+# Values marked PLACEHOLDER are waiting on the lab's real numbers.
+# Any value can be overridden for one run:  python run.py --set top_k=10 generate ...
+
+[paths]
+data_dir = "data"               # each corpus lives in data/<name>/
+chroma_dir = "chroma_db"        # where ChromaDB keeps its vectors on disk
+runs_file = "runs/runs.jsonl"   # one JSON line per run, for the lab's evaluation
+
+[ingest]
+extensions = [".txt", ".md", ".rst", ".py", ".java", ".lj", ".html", ".htm"]   # file types read from data/<name>/
+
+# Which files count as each corpus's API, as glob patterns relative to data/<name>/
+# ("**" means any number of sub-folders). A corpus listed here reads only these files;
+# a corpus not listed reads every file with an extension above.
+[corpus_include]
+jes = [
+  "api_reference.md",
+  "jes-6.0/jes/python/**/*.py",      # the Python functions students call (media.py, ...)
+  "jes-6.0/jes/java/**/*.java",      # the classes behind them (Picture, Sound, Pixel, ...)
+  "jes-6.0/jes/help/**/*.html",      # JES's help pages for students
+]
+"less-java" = [
+  "api_reference.md",
+  "less-java/README.md",
+  "less-java/src/**/*.java",
+  "less-java/tests/**/*.lj",
+  "less-java/distribution/**/*.lj",
+]
+
+[chunking]
+chunk_size = 500   # PLACEHOLDER: words per chunk
+overlap = 100      # PLACEHOLDER: words shared by neighbouring chunks; must be smaller than chunk_size
+
+[embedding]
+provider = "sentence-transformers"     # "sentence-transformers" (runs inside Python) or "ollama" (runs in the Ollama app)
+model = "all-MiniLM-L6-v2"             # PLACEHOLDER: the lab uses provider = "ollama", model = "qwen3-embedding:0.6b"
+ollama_url = "http://localhost:11434"
+
+[retrieval]
+top_k = 5                     # PLACEHOLDER: chunks kept per query (srag) or per concept (agentic)
+max_concepts = 6              # agentic: most concepts the decompose step may list
+max_queries_per_concept = 2   # agentic: search queries Agent 1 may write per concept
+
+[generation]
+model = "claude-sonnet-5-5"
+max_tokens = 16000
+effort = "high"   # low | medium | high | xhigh | max (how hard Claude thinks; higher costs more)
+
+[loops]
+max_critique_loops = 3   # PLACEHOLDER: times the critic may send retrieval back for another try
+max_repair_iters = 3     # PLACEHOLDER: lab notes say 3 or 5 (used from Phase 3)
+json_retries = 1         # times an agent is asked again after a reply that isn't valid JSON
+
+[execution]
+language = "python"       # language of the generated code (only python has a runner so far)
+python_executable = ""    # "" = the Python running this pipeline
+timeout_s = 30            # a test run taking longer than this is stopped and counts as failed
+max_output_chars = 4000   # test output kept for the log and the repair step (the end is kept)
+
+# Can the generated tests use the real library? Per corpus; unlisted corpora use "fake".
+#   fake      - the library isn't installed; tests replace the library functions with small fakes
+#   installed - the library can be imported by python_executable; tests may call it for real
+[library_runtime]
+jes = "fake"         # needs Jython + Java, so plain Python can't run it
+jes4py = "fake"
+"less-java" = "fake"
+
+[experiment]
+mode = "srag"                 # nc | srag | agentic (only srag exists so far)
+order = "description_first"   # description_first | solution_first | tests_first (used from Phase 4)
+context_budget_lines = 0      # max lines of retrieved docs given to the generator; 0 = no limit (used from Phase 4)
