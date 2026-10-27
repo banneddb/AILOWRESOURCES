@@ -1,32 +1,25 @@
 """
-The agentic pipeline, in two loops.
+The agentic retrieval loop:
 
-1. Retrieval loop:
-     decompose -> Agent 1 (write queries, search) -> Agent 2 (critique)
-       critique says "rewrite_queries" -> Agent 1 again, for the concepts that didn't fit
-       critique says "redecompose"     -> make a new concept plan, then search again
-       at most max_critique_loops times
+  decompose -> Agent 1 (write queries, search) -> Agent 2 (critique)
+    critique says "rewrite_queries" -> Agent 1 again, for the concepts that didn't fit
+    critique says "redecompose"     -> make a new concept plan, then search again
+    at most max_critique_loops times
 
-2. Generation loop:
-     Agent 3 (generate) -> hallucination check + run the tests in a sandbox
-       tests fail or a function doesn't exist -> Agent 3 repairs, then check + run again
-       at most max_repair_iters times
+Its result then goes to the generation loop (generation.py) with repairs allowed.
 """
 
 from dataclasses import dataclass
 
 from .agents.critic import critique
 from .agents.decompose import decompose
-from .agents.generator import Assignment, generate, problems_text, repair
+from .agents.generator import plan_text
 from .agents.retriever import run_queries, write_queries
-from .api_check import check_code
-from .api_index import ApiIndex, build_api_index
+from .api_index import ApiIndex
 from .config import Config
 from .embeddings import make_embedder
 from .logger import RunLog
-from .prompts import build_request
 from .retrieve import Chunk
-from .runners import get_runner
 
 
 @dataclass
@@ -47,6 +40,9 @@ class RetrievalResult:
                     seen.add(chunk.id)
                     chunks.append(chunk)
         return chunks
+
+    def plan(self) -> str:
+        return plan_text(self.concepts, self.verdicts)
 
 
 def _redecompose_feedback(review: dict) -> str:
@@ -106,44 +102,3 @@ def retrieval_loop(cfg: Config, log: RunLog, *, corpus: str, request: str, index
     log.record["decomposed_concepts"] = concepts
     log.record["retrieval_stop"] = stop
     return RetrievalResult(concepts, chunks_by_concept, verdicts, stop)
-
-
-def generation_loop(cfg: Config, log: RunLog, *, corpus: str, request: str, retrieval: RetrievalResult,
-                    index: ApiIndex) -> Assignment:
-    runner = get_runner(cfg)
-    context = retrieval.context_chunks()
-    assignment = generate(cfg, log, corpus=corpus, request=request, concepts=retrieval.concepts,
-                          verdicts=retrieval.verdicts, context=context, runner=runner)
-
-    for attempt in range(cfg.max_repair_iters + 1):   # first try + up to max_repair_iters repairs
-        check = check_code([assignment.solution, assignment.tests], index, cfg.language)
-        execution = runner.run(assignment.solution, assignment.tests)
-        log.add_attempt(attempt, assignment, check, execution)
-
-        if execution.passed and not check.hallucinated:
-            log.record["outcome"] = "passed"
-            break
-        if attempt == cfg.max_repair_iters:
-            log.record["outcome"] = "repair_cap_reached"   # out of repairs: keep the last version
-            break
-        assignment = repair(cfg, log, corpus=corpus, request=request, assignment=assignment,
-                            problems=problems_text(execution, check, corpus), context=context, runner=runner)
-        log.record["repair_iterations"] += 1
-    return assignment
-
-
-def run_agentic(cfg: Config, *, corpus: str, concepts: str,
-                dataset_description: str = "") -> tuple[RunLog, RetrievalResult | None]:
-    log = RunLog(cfg, mode="agentic", corpus=corpus, concepts=concepts, dataset_description=dataset_description)
-    result = None
-    try:
-        index = build_api_index(cfg, corpus)
-        log.record["api_index_version"] = index.version
-        request = build_request(concepts, dataset_description)
-        result = retrieval_loop(cfg, log, corpus=corpus, request=request, index=index)
-        generation_loop(cfg, log, corpus=corpus, request=request, retrieval=result, index=index)
-        log.write(status="ok")
-    except Exception as e:
-        log.write(status="error", error=f"{type(e).__name__}: {e}")
-        raise
-    return log, result

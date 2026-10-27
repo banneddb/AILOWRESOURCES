@@ -30,6 +30,10 @@ class AgentError(RuntimeError):
     """An agent couldn't produce a usable answer (e.g. invalid JSON after every retry)."""
 
 
+class RefusedError(AgentError):
+    """Claude declined the request (stop_reason "refusal"). Logged as status "refused"."""
+
+
 @dataclass
 class LLMResult:
     role: str             # which step made the call, e.g. "srag_generate", "critic"
@@ -109,7 +113,7 @@ def call_claude_json(cfg: Config, log, *, role: str, system: str, user: str, sch
         result = call_claude(cfg, role=role, system=system, messages=messages, json_schema=schema)
         log.add_llm_call(result)
         if result.stop_reason == "refusal":
-            raise AgentError(f"{role}: Claude declined the request")
+            raise RefusedError(f"{role}: Claude declined the request")
 
         data, error = parse_json(result.text)
         if error is None and validate:

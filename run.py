@@ -9,6 +9,7 @@ Single entry point for the pipeline. Every experiment condition runs through her
   python run.py generate --corpus bridges --concepts "loops, dictionaries" \
                          --dataset-description "USGS earthquake data"
   python run.py generate --mode agentic --corpus jes --concepts "loops, lists"
+  python run.py generate --mode nc --order tests_first --budget 100 --corpus jes --concepts "loops"
 
 Settings come from config.toml. Override any of them for one run with --set:
   python run.py --set top_k=10 --set chunk_size=300 generate ...
@@ -66,28 +67,23 @@ def print_retrieval(result):
 
 
 def cmd_generate(cfg, args):
-    if cfg.mode == "srag":
-        from pipeline.srag import run_srag
-        log = run_srag(cfg, corpus=args.corpus, concepts=args.concepts,
-                       dataset_description=args.dataset_description)
-        print(log.record["generated"]["raw_text"])
-        print(f"\nAPIs used: {log.record['apis_used']}\nNot in corpus: {log.record['hallucinated_apis']}")
-    elif cfg.mode == "agentic":
-        from pipeline.agentic import run_agentic
-        log, result = run_agentic(cfg, corpus=args.corpus, concepts=args.concepts,
-                                  dataset_description=args.dataset_description)
-        print_retrieval(result)
-        r = log.record
-        print(f"\n{'=' * 70}\n{r['generated']['description']}\n\n--- solution.py ---\n{r['generated']['solution']}"
-              f"\n\n--- test_solution.py ---\n{r['generated']['tests']}\n{'=' * 70}")
-        for a in r["attempts"]:
-            print(f"attempt {a['attempt']}: tests {a['execution']['summary']}; "
-                  f"not in corpus: {a['api_check']['hallucinated'] or 'none'}")
-        print(f"Outcome: {r['outcome']} after {r['repair_iterations']} repairs. APIs used: {r['apis_used']}")
-    else:
-        sys.exit(f"Mode {cfg.mode!r} isn't built yet (Phase 4).")
+    from pipeline.modes import run
+    log, retrieval = run(cfg, corpus=args.corpus, concepts=args.concepts,
+                         dataset_description=args.dataset_description)
     r = log.record
-    print(f"\n[run {r['run_id']} | status {r['status']} | {len(r['llm_calls'])} Claude calls | "
+    if retrieval:
+        print_retrieval(retrieval)
+    c = r["context"]
+    docs = (f"{len(c['chunks_given'])} of {c['chunks_available']} chunks, {c['lines_given']} lines "
+            f"(budget: {c['budget_lines'] or 'none'})") if c else "none (nc mode)"
+    print(f"\nDocs given to the generator: {docs}\nParts written in this order: {', '.join(r['parts_order'])}")
+    print(f"\n{'=' * 70}\n{r['generated']['description']}\n\n--- solution.py ---\n{r['generated']['solution']}"
+          f"\n\n--- test_solution.py ---\n{r['generated']['tests']}\n{'=' * 70}")
+    for a in r["attempts"]:
+        print(f"attempt {a['attempt']}: tests {a['execution']['summary']}; "
+              f"not in corpus: {a['api_check']['hallucinated'] or 'none'}")
+    print(f"Outcome: {r['outcome']} after {r['repair_iterations']} repairs. APIs used: {r['apis_used']}")
+    print(f"\n[run {r['run_id']} | mode {r['mode']} | status {r['status']} | {len(r['llm_calls'])} Claude calls | "
           f"{r['total_input_tokens']} in / {r['total_output_tokens']} out tokens | "
           f"{r['wall_clock_s']}s | logged to {cfg.runs_file}]")
 
@@ -119,7 +115,10 @@ def main():
     p.add_argument("--corpus", required=True)
     p.add_argument("--concepts", required=True, help='e.g. "loops, dictionaries"')
     p.add_argument("--dataset-description", default="")
-    p.add_argument("--mode", help="shortcut for --set mode=...")
+    p.add_argument("--mode", help="nc | srag | agentic (shortcut for --set mode=...)")
+    p.add_argument("--order", help="description_first | solution_first | tests_first (shortcut for --set order=...)")
+    p.add_argument("--budget", type=int, help="max lines of docs for the generator, 0 = no limit "
+                                              "(shortcut for --set context_budget_lines=...)")
     p.set_defaults(func=cmd_generate)
 
     args = parser.parse_args()
@@ -128,8 +127,9 @@ def main():
 
     try:
         overrides = dict(parse_override(s) for s in args.set)
-        if getattr(args, "mode", None):
-            overrides["mode"] = args.mode
+        for flag, key in (("mode", "mode"), ("order", "order"), ("budget", "context_budget_lines")):
+            if getattr(args, flag, None) is not None:
+                overrides[key] = getattr(args, flag)
         cfg = load_config(args.config, overrides)
     except ConfigError as e:
         sys.exit(str(e))

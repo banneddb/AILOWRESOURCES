@@ -67,6 +67,10 @@ jes4py = "fake"
 "less-java" = "fake"
 
 [experiment]
-mode = "srag"                 # nc | srag | agentic (only srag exists so far)
-order = "description_first"   # description_first | solution_first | tests_first (used from Phase 4)
-context_budget_lines = 0      # max lines of retrieved docs given to the generator; 0 = no limit (used from Phase 4)
+mode = "srag"                 # nc (no docs) | srag (one search, then generate) | agentic (full pipeline)
+order = "description_first"   # which part the generator writes first; the others follow:
+                              #   description_first: description, solution, tests
+                              #   solution_first:    solution, tests, description
+                              #   tests_first:       tests, solution, description
+context_budget_lines = 0      # max lines of retrieved docs given to the generator, best chunks first;
+                              # 0 = no limit. Not used by nc (it gets no docs).

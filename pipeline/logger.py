@@ -14,10 +14,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import Config
+from .config import PART_ORDERS, Config
 
-SCHEMA_VERSION = 3   # 2: per-concept retrievals, retrieval_stop, api_index_version, api_check
+SCHEMA_VERSION = 4   # 2: per-concept retrievals, retrieval_stop, api_index_version, api_check
                      # 3: attempts, outcome
+                     # 4: every mode generates + tests; parts_order, context; outcome passed|failed;
+                     #    generated.raw_text removed
 
 
 class RunLog:
@@ -32,6 +34,7 @@ class RunLog:
             "error": None,
             "mode": mode,
             "order": cfg.order,
+            "parts_order": list(PART_ORDERS[cfg.order]),   # the order the generator wrote the parts in
             "dataset": corpus,
             "requested_concepts": concepts,
             "dataset_description": dataset_description,
@@ -42,10 +45,11 @@ class RunLog:
             "apis_used": None,                  # real API names the generated code calls
             "hallucinated_apis": None,          # names it calls that aren't in the corpus
             "api_check": None,                  # full check result: suggestions, parse errors
-            "generated": {"description": None, "solution": None, "tests": None, "raw_text": None},  # final version
+            "context": None,                    # docs given to the generator (see retrieve.apply_budget); None in nc
+            "generated": {"description": None, "solution": None, "tests": None},   # final version
             "execution": None,                  # final test run: passed, counts, output, error text
-            "outcome": None,                    # agentic: passed | repair_cap_reached
-            "repair_iterations": 0,             # repair calls made
+            "outcome": None,                    # passed (tests pass, no unknown APIs) | failed
+            "repair_iterations": 0,             # repair calls made (always 0 in nc and srag)
             "attempts": [],                     # every version: files + api check + test run
             "prompts": {},                      # prompt name -> version hash
             "llm_calls": [],
@@ -74,6 +78,7 @@ class RunLog:
            "concepts": [...] if a new concept plan started here, else None,
            "retrievals": [{"concept": ..., "query": ..., "chunks": [{"id", "source", "score"}]}],
            "critique": {"action", "reason", "concepts": [verdict per concept]} or None (srag)}
+        nc has no retrieval, so its list stays empty.
         """
         self.record["iterations"].append(entry)
 

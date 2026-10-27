@@ -10,7 +10,15 @@ import tomllib
 from dataclasses import asdict, dataclass, fields
 
 MODES = ("nc", "srag", "agentic")
-ORDERS = ("description_first", "solution_first", "tests_first")
+# The `order` switch: the order the generator writes the assignment's parts in.
+# Each part is written knowing the ones before it, so e.g. solution_first means
+# the description is written to match finished, tested code.
+PART_ORDERS = {
+    "description_first": ("description", "solution", "tests"),
+    "solution_first": ("solution", "tests", "description"),
+    "tests_first": ("tests", "solution", "description"),
+}
+ORDERS = tuple(PART_ORDERS)
 EMBEDDING_PROVIDERS = ("sentence-transformers", "ollama")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 LANGUAGES = ("python",)            # languages with a code runner (see pipeline/runners/)

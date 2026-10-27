@@ -3,6 +3,7 @@ Ingest a corpus: read every doc file in data/<corpus>/, chunk it, embed the
 chunks, and store them in that corpus's Chroma collection.
 """
 
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from .store import collection_name, delete_collection, get_collection
 class _HTMLToText(HTMLParser):
     """Keep the visible text of an HTML page (e.g. generated API docs), drop tags/scripts."""
     SKIP = {"script", "style"}
+    # Tags that start a new line on the rendered page, so they start one in the text too.
+    BLOCK = {"p", "br", "div", "li", "tr", "pre", "table", "ul", "ol", "dl", "dt", "dd",
+             "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "hr"}
 
     def __init__(self):
         super().__init__()
@@ -23,10 +27,14 @@ class _HTMLToText(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag in self.SKIP:
             self._skipping += 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
 
     def handle_endtag(self, tag):
         if tag in self.SKIP and self._skipping:
             self._skipping -= 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
 
     def handle_data(self, data):
         if not self._skipping:
@@ -38,7 +46,9 @@ def read_doc(path: Path) -> str:
     if path.suffix.lower() in (".html", ".htm"):
         parser = _HTMLToText()
         parser.feed(text)
-        text = " ".join(parser.parts)
+        text = "".join(parser.parts)
+        text = re.sub(r"[ \t]+\n", "\n", text)          # trailing spaces
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()  # at most one blank line in a row
     return text
 
 
