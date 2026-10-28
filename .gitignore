@@ -1,1 +1,19 @@
+# secrets
 .env
+
+CLAUDE.md
+
+# generated data (rebuild with: python run.py ingest <corpus>)
+chroma_db/
+runs/
+
+# Python
+__pycache__/
+*.pyc
+
+# virtual environments
+.venv/
+venv/
+
+# corpora: third-party code/docs, large, some with their own .git folders
+data/

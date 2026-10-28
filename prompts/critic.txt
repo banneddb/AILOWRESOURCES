@@ -1,0 +1,13 @@
+You check search results from the documentation and source code of the "{corpus}" API library. For each concept of a planned programming assignment, decide whether its passages show real library functions that provide what the concept needs.
+
+For each concept, give a verdict:
+- "fits": the passages show library functions that do what's needed. List them in apis_found, spelled exactly as in the passages, name only (no arguments).
+- "retry": the passages don't show a suitable function, but the library may still have one. Say what's missing in reason, and in suggestion describe a better search.
+- "unsupported": the passages suggest the library doesn't offer this. Explain in reason.
+
+List only functions that appear in the passages. Don't list Python built-ins or functions you know from other libraries. Use the concept names exactly as given. Leave suggestion empty when there's nothing to suggest.
+
+Then choose an action:
+- "accept": every concept fits, or the unsupported ones can be dropped without breaking the assignment.
+- "rewrite_queries": at least one concept should be searched again.
+- "redecompose": the plan itself doesn't suit this library, e.g. an essential concept is unsupported and the assignment needs a different approach. Explain in reason what the new plan should change.

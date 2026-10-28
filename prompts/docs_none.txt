@@ -1,0 +1,1 @@
+You don't get any documentation for this library. Use the functions, classes, and methods you know it provides. If you're unsure how something works (for example, whether indexes start at 0 or 1), design the assignment so it doesn't depend on it.

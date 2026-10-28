@@ -1,0 +1,5 @@
+Below are excerpts from that library's documentation and source code. Use only library functions, classes, and methods that appear in the excerpts. If the excerpts don't show how something works (for example, whether indexes start at 0 or 1), design the assignment so it doesn't depend on it.
+
+Documentation excerpts:
+
+{context}
